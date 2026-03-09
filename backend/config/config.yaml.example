@@ -1,0 +1,24 @@
+server:
+  addr: ":8080"
+  mode: "debug" # debug/release
+
+mysql:
+  # 示例：user:pass@tcp(127.0.0.1:3306)/cursor_cmdb?charset=utf8mb4&parseTime=True&loc=Local
+  dsn: "root:root@tcp(127.0.0.1:3306)/cursor_cmdb?charset=utf8mb4&parseTime=True&loc=Local"
+  max_open_conns: 50
+  max_idle_conns: 10
+
+jwt:
+  secret: "change-me"
+  expire_h: 24
+  issuer: "cursor-cmdb"
+  audience: "cursor-cmdb-web"
+
+log:
+  level: "info"
+  format: "console" # console/json
+
+app:
+  # true 时启动会自动建表 + 尝试写入默认角色/菜单/casbin策略（幂等）
+  bootstrap: true
+

@@ -1,0 +1,22 @@
+server:
+  addr: ":8080"
+  mode: "debug"
+
+mysql:
+  dsn: "root:123456@tcp(127.0.0.1:3306)/cursor_cmdb?charset=utf8mb4&parseTime=True&loc=Local"
+  max_open_conns: 50
+  max_idle_conns: 10
+
+jwt:
+  secret: "change-me"
+  expire_h: 24
+  issuer: "cursor-cmdb"
+  audience: "cursor-cmdb-web"
+
+log:
+  level: "info"
+  format: "console"
+
+app:
+  bootstrap: true
+
