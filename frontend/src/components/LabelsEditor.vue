@@ -1,8 +1,8 @@
 <template>
   <div class="labels">
     <div v-for="(row, idx) in rows" :key="idx" class="row">
-      <el-input v-model="row.key" placeholder="key" class="k" />
-      <el-input v-model="row.value" placeholder="value" class="v" />
+      <el-input v-model="row.key" placeholder="key" class="k" @input="handleInput" />
+      <el-input v-model="row.value" placeholder="value" class="v" @input="handleInput" />
       <el-button text type="danger" class="x" @click="remove(idx)">
         <el-icon><Delete /></el-icon>
       </el-button>
@@ -25,16 +25,25 @@ const rows = reactive<{ key: string; value: string }[]>([])
 
 const normalized = computed(() => props.modelValue || {})
 
+// 监听props变化，更新内部rows
 watch(
   normalized,
   (v) => {
+    // 清空现有rows
     rows.splice(0, rows.length)
-    for (const [k, val] of Object.entries(v)) rows.push({ key: k, value: String(val ?? '') })
-    if (!rows.length) rows.push({ key: '', value: '' })
+    // 添加现有标签
+    for (const [k, val] of Object.entries(v)) {
+      rows.push({ key: k, value: String(val ?? '') })
+    }
+    // 确保至少有一个空行
+    if (!rows.length) {
+      rows.push({ key: '', value: '' })
+    }
   },
-  { immediate: true },
+  { immediate: true }
 )
 
+// 同步数据到父组件
 function sync() {
   const out: Record<string, string> = {}
   for (const r of rows) {
@@ -45,15 +54,24 @@ function sync() {
   emit('update:modelValue', out)
 }
 
-watch(rows, sync, { deep: true })
+// 只在用户输入时同步，避免循环更新
+function handleInput() {
+  sync()
+}
 
+// 添加新标签
 function add() {
   rows.push({ key: '', value: '' })
 }
 
+// 移除标签
 function remove(i: number) {
   rows.splice(i, 1)
-  if (!rows.length) rows.push({ key: '', value: '' })
+  if (!rows.length) {
+    rows.push({ key: '', value: '' })
+  }
+  // 移除后同步
+  sync()
 }
 </script>
 
