@@ -4,7 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
+	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -234,94 +235,109 @@ func (h *Handler) AssetExportExcel(c *gin.Context) {
 	owner := strings.TrimSpace(c.Query("owner"))
 	tags := strings.TrimSpace(c.Query("tags"))
 	label := strings.TrimSpace(c.Query("label"))
+
 	dbq := h.DB.Model(&model.CMDBAsset{})
+
+	// ==================== 查询条件（优化后的写法，更清晰且防注入） ====================
 	if q != "" {
 		like := "%" + q + "%"
 		dbq = dbq.Where(
-			"service_name like ? or private_ip like ? or owner like ? or tags like ? or cast(labels as char) like ?",
-			like, like, like, like, like,
+			h.DB.Where("service_name LIKE ?", like).
+				Or("private_ip LIKE ?", like).
+				Or("owner LIKE ?", like).
+				Or("tags LIKE ?", like).
+				Or("CAST(labels AS CHAR) LIKE ?", like),
 		)
 	}
 	if serviceName != "" {
-		like := "%" + serviceName + "%"
-		dbq = dbq.Where("service_name like ?", like)
+		dbq = dbq.Where("service_name LIKE ?", "%"+serviceName+"%")
 	}
 	if ip != "" {
 		like := "%" + ip + "%"
-		dbq = dbq.Where("private_ip like ? or public_ip like ?", like, like)
+		dbq = dbq.Where("private_ip LIKE ? OR public_ip LIKE ?", like, like)
 	}
 	if owner != "" {
-		like := "%" + owner + "%"
-		dbq = dbq.Where("owner like ?", like)
+		dbq = dbq.Where("owner LIKE ?", "%"+owner+"%")
 	}
 	if tags != "" {
-		like := "%" + tags + "%"
-		dbq = dbq.Where("tags like ?", like)
+		dbq = dbq.Where("tags LIKE ?", "%"+tags+"%")
 	}
 	if label != "" {
-		like := "%" + label + "%"
-		dbq = dbq.Where("cast(labels as char) like ?", like)
+		dbq = dbq.Where("CAST(labels AS CHAR) LIKE ?", "%"+label+"%")
 	}
+
+	// ==================== 查询数据（建议根据实际数据量调整或改成分页导出） ====================
 	var items []model.CMDBAsset
 	if err := dbq.Order("id desc").Limit(5000).Find(&items).Error; err != nil {
-		utils.Fail(c, 500, "导出失败")
+		utils.Fail(c, 500, "查询数据失败")
 		return
 	}
 
+	// ==================== 生成 Excel（核心：改为内存 Buffer） ====================
 	f := excelize.NewFile()
-	sheets := f.GetSheetList()
-	sheetName := sheets[0]
-	if len(sheets) == 0 {
-		_, _ = f.NewSheet("Sheet1")
-		sheetName = "Sheet1"
-	}
+	sheetName := "Assets"               // 推荐使用有意义的 sheet 名
+	f.SetSheetName("Sheet1", sheetName) // 把默认的 Sheet1 改名
+
+	// 表头
 	headers := []string{
-		"ID", "服务名称", "私网IP", "公网IP", "标签(labels)", "tags", "负责人", "云供应商", "地域", "实例规格", "状态", "备注", "创建时间", "更新时间",
+		"ID", "服务名称", "私网IP", "公网IP", "标签(labels)", "tags", "负责人",
+		"云供应商", "地域", "实例规格", "状态", "备注", "创建时间", "更新时间",
 	}
 	for i, h1 := range headers {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
 		_ = f.SetCellValue(sheetName, cell, h1)
 	}
+
+	// 数据行
 	for r, a := range items {
 		row := r + 2
+
 		labelsStr := ""
 		if a.Labels != nil {
 			if b, err := json.Marshal(a.Labels); err == nil {
 				labelsStr = string(b)
+			} else {
+				labelsStr = "[序列化失败]"
 			}
 		}
+
 		values := []interface{}{
-			a.ID, a.ServiceName, a.PrivateIP, a.PublicIP, labelsStr, a.Tags, a.Owner, a.CloudProvider, a.Region, a.InstanceType, a.Status, a.Remark,
+			a.ID, a.ServiceName, a.PrivateIP, a.PublicIP, labelsStr, a.Tags, a.Owner,
+			a.CloudProvider, a.Region, a.InstanceType, a.Status, a.Remark,
 			a.CreatedAt.Format(time.RFC3339), a.UpdatedAt.Format(time.RFC3339),
 		}
+
 		for i, v := range values {
 			cell, _ := excelize.CoordinatesToCellName(i+1, row)
 			_ = f.SetCellValue(sheetName, cell, v)
 		}
 	}
 
-	var body []byte
-	if tmpFile, err := os.CreateTemp("", "cmdb_export_*.xlsx"); err != nil {
-		utils.Fail(c, 500, "导出失败")
+	// ==================== 直接写入内存 Buffer（关键改动） ====================
+	buf, err := f.WriteToBuffer()
+	if err != nil {
+		utils.Fail(c, 500, "生成 Excel 文件失败")
 		return
-	} else {
-		tmpPath := tmpFile.Name()
-		_ = tmpFile.Close()
-		defer os.Remove(tmpPath)
-		if err := f.SaveAs(tmpPath); err != nil {
-			utils.Fail(c, 500, "导出失败")
-			return
-		}
-		body, _ = os.ReadFile(tmpPath)
 	}
-	if len(body) == 0 {
-		utils.Fail(c, 500, "导出失败")
+	if buf.Len() == 0 {
+		utils.Fail(c, 500, "导出数据为空")
 		return
 	}
 
+	// ==================== 设置响应头（UTF-8 中文文件名兼容） ====================
 	filename := fmt.Sprintf("cmdb_assets_%s.xlsx", time.Now().Format("20060102_150405"))
+	encodedFilename := url.QueryEscape(filename)
+
 	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
-	c.Header("Content-Length", strconv.Itoa(len(body)))
-	c.Data(200, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", body)
+	c.Header("Content-Disposition", `attachment; filename*=UTF-8''`+encodedFilename)
+	c.Header("Content-Length", strconv.Itoa(buf.Len()))
+
+	// ==================== 返回文件流 ====================
+	c.DataFromReader(
+		http.StatusOK,
+		int64(buf.Len()),
+		"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+		buf,
+		nil,
+	)
 }

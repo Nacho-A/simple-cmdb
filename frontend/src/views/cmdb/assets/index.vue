@@ -278,38 +278,64 @@ async function exportExcel() {
       params: { ...query },
       responseType: 'blob',
     })
+
+    // ── 优先判断是否是错误响应（即使状态码 200，但内容是 json）
     const contentType = resp.headers?.['content-type'] || ''
     if (contentType.includes('application/json')) {
-      const text = await (resp.data as Blob).text()
-      const json = JSON.parse(text) as ApiResp
-      ElMessage.error(json.message || '导出失败')
-      return
-    }
-    const blob = resp.data instanceof Blob ? resp.data : new Blob([resp.data])
-    if (blob.size === 0) {
-      ElMessage.error('导出结果为空')
-      return
-    }
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `cmdb_assets_${new Date().toISOString().slice(0, 19).replace(/[-:T]/g, '')}.xlsx`
-    a.click()
-    URL.revokeObjectURL(url)
-    ElMessage.success('导出成功')
-  } catch (e: any) {
-    if (e?.response?.data instanceof Blob) {
-      const text = await e.response.data.text()
+      let errorMsg = '导出失败'
       try {
+        const text = await resp.data.text()
         const json = JSON.parse(text)
-        ElMessage.error(json.message || '导出失败')
-      } catch {
-        ElMessage.error('导出失败')
-      }
-    } else {
-      ElMessage.error('导出失败')
+        errorMsg = json.message || errorMsg
+      } catch {}
+      ElMessage.error(errorMsg)
+      return
     }
+
+    // ── 正常文件流处理
+    const blob = resp.data // responseType: 'blob' 时基本就是 Blob
+    if (!(blob instanceof Blob) || blob.size === 0) {
+      ElMessage.error('导出结果为空或无效')
+      return
+    }
+
+    // 生成更友好的文件名
+    const now = new Date()
+    const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '')          // 20260309
+    const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '')          // 124500
+    const filename = `cmdb_assets_${dateStr}_${timeStr}.xlsx`
+
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)   // 某些浏览器需要 append 才能触发
+    link.click()
+
+    // 清理
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+
+    ElMessage.success('导出成功，正在下载...')
+  } catch (err: any) {
+    let errorMsg = '导出失败，请稍后重试'
+
+    // 尝试从 blob 错误响应中提取 json message（最常见的情况）
+    if (err.response?.data instanceof Blob) {
+      try {
+        const text = await err.response.data.text()
+        const json = JSON.parse(text)
+        errorMsg = json.message || errorMsg
+      } catch {
+        // 如果解析失败，就保持默认提示
+      }
+    } else if (err.message) {
+      errorMsg = err.message
+    }
+
+    ElMessage.error(errorMsg)
   }
+  // 可选：finally { loading.value = false } 如果你有 loading 状态
 }
 
 onMounted(async () => {
