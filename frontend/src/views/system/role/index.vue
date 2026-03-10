@@ -44,15 +44,16 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="menuDialog.visible" title="角色菜单权限" width="720px">
+    <el-dialog v-model="menuDialog.visible" title="角色菜单权限" width="800px">
       <div class="menu-box glass">
         <el-tree
           ref="treeRef"
           :data="menuTree"
           node-key="id"
           show-checkbox
-          :default-expand-all="true"
+          default-expand-all
           :props="{ label: 'name', children: 'children' }"
+          check-strictly
         />
       </div>
       <template #footer>
@@ -64,10 +65,11 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { nextTick, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import SearchForm from '@/components/SearchForm.vue'
 import { request } from '@/utils/request'
+import { useUserStore } from '@/stores/user'
 import type { ApiResp } from '@/types/api'
 import type { MenuNode } from '@/types/menu'
 
@@ -86,6 +88,7 @@ const rules: FormRules = {
 const menuTree = ref<MenuNode[]>([])
 const treeRef = ref<any>()
 const menuDialog = reactive({ visible: false, loading: false, roleId: 0 })
+const userStore = useUserStore()
 
 function resetQ() {
   q.value = ''
@@ -143,15 +146,21 @@ async function removeOne(row: RoleRow) {
 
 async function fetchMenus() {
   const resp = await request.get<ApiResp<{ items: MenuNode[] }>>('/menus')
-  menuTree.value = resp.data.data.items || []
+  menuTree.value = resp.data.data.items?.length ? resp.data.data.items : []
 }
 
 async function openMenus(row: RoleRow) {
   menuDialog.visible = true
   menuDialog.roleId = row.id
   await fetchMenus()
+  if (menuTree.value.length === 0) {
+    ElMessage.warning('没有可用的菜单')
+    menuDialog.visible = false
+    return
+  }
   const resp = await request.get<ApiResp<{ menu_ids: number[] }>>(`/roles/${row.id}/menus`)
   const ids = resp.data.data.menu_ids || []
+  await nextTick()
   treeRef.value?.setCheckedKeys(ids, false)
 }
 
@@ -159,11 +168,10 @@ async function saveMenus() {
   menuDialog.loading = true
   try {
     const ids = (treeRef.value?.getCheckedKeys?.() || []) as number[]
-    const half = (treeRef.value?.getHalfCheckedKeys?.() || []) as number[]
-    const menu_ids = Array.from(new Set([...ids, ...half]))
-    await request.post<ApiResp>(`/roles/${menuDialog.roleId}/menus`, { menu_ids })
+    await request.post<ApiResp>(`/roles/${menuDialog.roleId}/menus`, { menu_ids: ids })
     ElMessage.success('保存成功')
     menuDialog.visible = false
+    await userStore.fetchMe()
   } finally {
     menuDialog.loading = false
   }

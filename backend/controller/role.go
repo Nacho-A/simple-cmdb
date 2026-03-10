@@ -64,8 +64,9 @@ func (h *Handler) RoleCreate(c *gin.Context) {
 }
 
 func (h *Handler) RoleUpdate(c *gin.Context) {
-	id, _ := strconv.Atoi(c.Param("id"))
-	if id <= 0 {
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil || id <= 0 {
 		utils.Fail(c, 500, "参数错误")
 		return
 	}
@@ -82,7 +83,7 @@ func (h *Handler) RoleUpdate(c *gin.Context) {
 		utils.OK(c, gin.H{})
 		return
 	}
-	if err := h.DB.Model(&model.Role{}).Where("id = ?", id).Updates(updates).Error; err != nil {
+	if err := h.DB.Model(&model.Role{}).Where("id = ?", uint(id)).Updates(updates).Error; err != nil {
 		utils.Fail(c, 500, "更新失败")
 		return
 	}
@@ -90,12 +91,13 @@ func (h *Handler) RoleUpdate(c *gin.Context) {
 }
 
 func (h *Handler) RoleDelete(c *gin.Context) {
-	id, _ := strconv.Atoi(c.Param("id"))
-	if id <= 0 {
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil || id <= 0 {
 		utils.Fail(c, 500, "参数错误")
 		return
 	}
-	if err := h.DB.Delete(&model.Role{}, id).Error; err != nil {
+	if err := h.DB.Delete(&model.Role{}, uint(id)).Error; err != nil {
 		utils.Fail(c, 500, "删除失败")
 		return
 	}
@@ -103,13 +105,14 @@ func (h *Handler) RoleDelete(c *gin.Context) {
 }
 
 func (h *Handler) RoleGetMenus(c *gin.Context) {
-	id, _ := strconv.Atoi(c.Param("id"))
-	if id <= 0 {
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil || id <= 0 {
 		utils.Fail(c, 500, "参数错误")
 		return
 	}
 	var role model.Role
-	if err := h.DB.Preload("Menus").First(&role, id).Error; err != nil {
+	if err := h.DB.Preload("Menus").First(&role, uint(id)).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			utils.Fail(c, 500, "角色不存在")
 			return
@@ -125,8 +128,9 @@ func (h *Handler) RoleGetMenus(c *gin.Context) {
 }
 
 func (h *Handler) RoleSaveMenus(c *gin.Context) {
-	id, _ := strconv.Atoi(c.Param("id"))
-	if id <= 0 {
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil || id <= 0 {
 		utils.Fail(c, 500, "参数错误")
 		return
 	}
@@ -137,7 +141,7 @@ func (h *Handler) RoleSaveMenus(c *gin.Context) {
 	}
 
 	var role model.Role
-	if err := h.DB.First(&role, id).Error; err != nil {
+	if err := h.DB.First(&role, uint(id)).Error; err != nil {
 		utils.Fail(c, 500, "角色不存在")
 		return
 	}
@@ -160,4 +164,3 @@ func (h *Handler) RoleSaveMenus(c *gin.Context) {
 	}
 	utils.OK(c, gin.H{})
 }
-

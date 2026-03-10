@@ -9,7 +9,7 @@
         </div>
       </div>
 
-      <el-table :data="flat" border row-key="id" height="calc(100vh - 210px)">
+      <el-table :data="tree" border row-key="id" tree-props="{ children: 'children' }" height="calc(100vh - 210px)">
         <el-table-column prop="name" label="名称" min-width="160" />
         <el-table-column prop="path" label="路径" min-width="200" />
         <el-table-column prop="component" label="组件" min-width="220" />
@@ -46,7 +46,7 @@
         <el-form-item label="父菜单">
           <el-select v-model="form.parent_id" clearable filterable style="width: 100%">
             <el-option :value="null" label="无（一级菜单）" />
-            <el-option v-for="m in flat" :key="m.id" :label="`${m.name} (${m.path})`" :value="m.id" />
+            <el-option v-for="m in treeFlat" :key="m.id" :label="`${m.name} (${m.path})`" :value="m.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="排序">
@@ -65,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { request } from '@/utils/request'
 import type { ApiResp } from '@/types/api'
@@ -73,19 +73,7 @@ import type { MenuNode } from '@/types/menu'
 
 const tree = ref<MenuNode[]>([])
 
-type FlatMenu = MenuNode & { children?: MenuNode[] }
-
-const flat = computed(() => {
-  const out: FlatMenu[] = []
-  const walk = (nodes: MenuNode[]) => {
-    for (const n of nodes || []) {
-      out.push(n as FlatMenu)
-      if (n.children?.length) walk(n.children)
-    }
-  }
-  walk(tree.value)
-  return out
-})
+const treeFlat = ref<MenuNode[]>([])
 
 const dialog = reactive({ visible: false, isEdit: false, loading: false, id: 0 })
 const formRef = ref<FormInstance>()
@@ -112,11 +100,13 @@ function resetForm() {
   form.parent_id = null
   form.order = 0
   form.hidden = false
+  buildTreeFlat()
 }
 
 async function fetchList() {
   const resp = await request.get<ApiResp<{ items: MenuNode[] }>>('/menus')
   tree.value = resp.data.data.items || []
+  buildTreeFlat()
 }
 
 function openCreate() {
@@ -168,6 +158,18 @@ async function removeOne(row: MenuNode) {
   await request.delete<ApiResp>('/menus/' + row.id)
   ElMessage.success('删除成功')
   fetchList()
+}
+
+function buildTreeFlat() {
+  const out: MenuNode[] = []
+  const walk = (nodes: MenuNode[]) => {
+    for (const n of nodes || []) {
+      out.push(n)
+      if (n.children?.length) walk(n.children)
+    }
+  }
+  walk(tree.value)
+  treeFlat.value = out
 }
 
 onMounted(fetchList)
