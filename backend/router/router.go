@@ -30,10 +30,17 @@ func New(cfg *config.Config, db *gorm.DB, log *zap.Logger) *gin.Engine {
 		v1.POST("/login", h.Login)
 
 		authed := v1.Group("")
+		authed.Use(middleware.APIKeyAuth())
 		authed.Use(middleware.JWTAuth(cfg.JWT.Secret, cfg.JWT.Issuer, cfg.JWT.Audience))
+		authed.Use(middleware.ScopeAuth())
 		authed.Use(middleware.CasbinAuth())
 
 		authed.GET("/me", h.Me)
+
+		// API Key 管理（admin）
+		authed.GET("/api-keys", h.APIKeyList)
+		authed.POST("/api-keys", h.APIKeyCreate)
+		authed.DELETE("/api-keys/:id", h.APIKeyDelete)
 
 		// 用户管理（admin）
 		authed.GET("/users", h.UserList)
@@ -65,10 +72,12 @@ func New(cfg *config.Config, db *gorm.DB, log *zap.Logger) *gin.Engine {
 		authed.POST("/cmdb/assets/batch-delete", h.AssetBatchDelete)
 		authed.GET("/cmdb/assets/export", h.AssetExportExcel)
 
+		// 服务 IP 查询
+		authed.GET("/cmdb/services/:name/ips", h.ServiceIPs)
+
 		// 公共接口
 		authed.GET("/cmdb/cloud-providers", h.CloudProviders)
 	}
 
 	return r
 }
-
