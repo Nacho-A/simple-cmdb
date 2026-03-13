@@ -20,6 +20,7 @@ func New(cfg *config.Config, db *gorm.DB, log *zap.Logger) *gin.Engine {
 
 	r := gin.New()
 	r.Use(cors.New(middleware.CORS()))
+	r.Use(middleware.Logger(log))
 	r.Use(middleware.Recovery(log))
 	r.GET("/healthz", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"ok": true}) })
 
@@ -30,10 +31,10 @@ func New(cfg *config.Config, db *gorm.DB, log *zap.Logger) *gin.Engine {
 		v1.POST("/login", h.Login)
 
 		authed := v1.Group("")
-		authed.Use(middleware.APIKeyAuth())
-		authed.Use(middleware.JWTAuth(cfg.JWT.Secret, cfg.JWT.Issuer, cfg.JWT.Audience))
-		authed.Use(middleware.ScopeAuth())
-		authed.Use(middleware.CasbinAuth())
+		authed.Use(middleware.APIKeyAuth(log))
+		authed.Use(middleware.JWTAuth(log, cfg.JWT.Secret, cfg.JWT.Issuer, cfg.JWT.Audience))
+		authed.Use(middleware.ScopeAuth(log))
+		authed.Use(middleware.CasbinAuth(log))
 
 		authed.GET("/me", h.Me)
 

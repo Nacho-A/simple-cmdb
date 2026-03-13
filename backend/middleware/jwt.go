@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"go.uber.org/zap"
 
 	"cursor-cmdb-backend/utils"
 )
@@ -35,7 +36,7 @@ func SignToken(secret, issuer, audience string, expireH int, userID uint, userna
 	return t.SignedString([]byte(secret))
 }
 
-func JWTAuth(secret, issuer, audience string) gin.HandlerFunc {
+func JWTAuth(log *zap.Logger, secret, issuer, audience string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if _, exists := c.Get(CtxScope); exists {
 			c.Next()
@@ -44,6 +45,7 @@ func JWTAuth(secret, issuer, audience string) gin.HandlerFunc {
 
 		auth := c.GetHeader("Authorization")
 		if auth == "" || !strings.HasPrefix(strings.ToLower(auth), "bearer ") {
+			log.Warn("auth", zap.String("path", c.Request.URL.Path), zap.String("error", "未登录"))
 			utils.Fail(c, 401, "未登录")
 			c.Abort()
 			return
@@ -54,6 +56,7 @@ func JWTAuth(secret, issuer, audience string) gin.HandlerFunc {
 			return []byte(secret), nil
 		}, jwt.WithIssuer(issuer), jwt.WithAudience(audience))
 		if err != nil || token == nil || !token.Valid {
+			log.Warn("auth", zap.String("path", c.Request.URL.Path), zap.String("error", "登录已过期"))
 			utils.Fail(c, 401, "登录已过期")
 			c.Abort()
 			return
@@ -61,6 +64,7 @@ func JWTAuth(secret, issuer, audience string) gin.HandlerFunc {
 
 		claims, ok := token.Claims.(*JWTClaims)
 		if !ok {
+			log.Warn("auth", zap.String("path", c.Request.URL.Path), zap.String("error", "无效的Token"))
 			utils.Fail(c, 401, "登录已过期")
 			c.Abort()
 			return
