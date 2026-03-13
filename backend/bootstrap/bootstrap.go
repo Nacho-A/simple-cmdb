@@ -10,7 +10,7 @@ import (
 )
 
 func AutoMigrate(db *gorm.DB) error {
-	if err := db.AutoMigrate(&model.User{}, &model.Role{}, &model.Menu{}, &model.CMDBAsset{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.Role{}, &model.Menu{}, &model.CMDBAsset{}, &model.APIKey{}); err != nil {
 		return fmt.Errorf("auto migrate: %w", err)
 	}
 	return nil
@@ -221,4 +221,3 @@ func SeedCasbinPolicies() error {
 	}
 	return nil
 }
-
