@@ -11,6 +11,11 @@ import (
 
 func CasbinAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if _, exists := c.Get(CtxScope); exists {
+			c.Next()
+			return
+		}
+
 		if casbinx.Enforcer == nil {
 			utils.Fail(c, 500, "权限引擎未初始化")
 			c.Abort()
@@ -49,4 +54,3 @@ func CasbinAuth() gin.HandlerFunc {
 		c.Abort()
 	}
 }
-
