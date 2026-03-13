@@ -71,7 +71,7 @@ Response:
 
 | 文件 | 改动 |
 |------|------|
-| `backend/controller/cmdb.go` | 新增 `ServiceList` 方法 |
+| `backend/controller/cmdb_asset.go` | 新增 `ServiceList` 方法 |
 | `backend/router/router.go` | 注册服务列表路由 |
 | `backend/bootstrap/bootstrap.go` | 新增菜单项 |
 
