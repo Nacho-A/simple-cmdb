@@ -364,29 +364,50 @@ func (h *Handler) ServiceList(c *gin.Context) {
 		zap.Int("page_size", pageSize),
 	)
 
-	dbq := h.DB.Model(&model.CMDBAsset{})
+	// Step 1: 查询匹配条件的服务名
+	filterDB := h.DB.Model(&model.CMDBAsset{})
 	if serviceName != "" {
-		dbq = dbq.Where("service_name LIKE ?", "%"+serviceName+"%")
+		filterDB = filterDB.Where("service_name LIKE ?", "%"+serviceName+"%")
 	}
 	if privateIP != "" {
-		dbq = dbq.Where("private_ip LIKE ?", "%"+privateIP+"%")
+		filterDB = filterDB.Where("private_ip LIKE ?", "%"+privateIP+"%")
 	}
 	if publicIP != "" {
-		dbq = dbq.Where("public_ip LIKE ?", "%"+publicIP+"%")
+		filterDB = filterDB.Where("public_ip LIKE ?", "%"+publicIP+"%")
 	}
 
+	var matchedNames []string
+	if err := filterDB.Distinct("service_name").Pluck("service_name", &matchedNames).Error; err != nil {
+		utils.Fail(c, 500, "查询失败")
+		return
+	}
+
+	if len(matchedNames) == 0 {
+		utils.OK(c, gin.H{
+			"items":     []ServiceItem{},
+			"total":     0,
+			"page":      page,
+			"page_size": pageSize,
+		})
+		return
+	}
+
+	// Step 2: 根据服务名查询所有相关资产
 	type serviceRow struct {
 		ServiceName string
 		PrivateIP   string
 		PublicIP    string
 	}
-
 	var rows []serviceRow
-	if err := dbq.Select("service_name, private_ip, public_ip").Find(&rows).Error; err != nil {
+	if err := h.DB.Model(&model.CMDBAsset{}).
+		Select("service_name, private_ip, public_ip").
+		Where("service_name IN ?", matchedNames).
+		Find(&rows).Error; err != nil {
 		utils.Fail(c, 500, "查询失败")
 		return
 	}
 
+	// Step 3: 聚合
 	serviceMap := make(map[string]*ServiceItem)
 	for _, row := range rows {
 		if row.ServiceName == "" {
