@@ -219,6 +219,10 @@ func SeedCasbinPolicies() error {
 
 		_, _ = casbinx.Enforcer.AddPolicy("viewer", "/api/v1/cmdb/assets*", "GET")
 
+		// 服务列表
+		_, _ = casbinx.Enforcer.AddPolicy("operator", "/api/v1/cmdb/services", "GET")
+		_, _ = casbinx.Enforcer.AddPolicy("viewer", "/api/v1/cmdb/services", "GET")
+
 		if err := casbinx.Enforcer.SavePolicy(); err != nil {
 			return err
 		}
