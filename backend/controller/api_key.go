@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 
 	"cursor-cmdb-backend/model"
 	"cursor-cmdb-backend/utils"
@@ -72,7 +73,8 @@ func (h *Handler) APIKeyCreate(c *gin.Context) {
 	}
 
 	if err := h.DB.Create(&apiKey).Error; err != nil {
-		utils.Fail(c, 500, "创建失败")
+		h.Log.Error("创建 API Key 失败", zap.Error(err))
+		utils.Fail(c, 500, "创建失败: "+err.Error())
 		return
 	}
 

@@ -37,6 +37,11 @@ func SignToken(secret, issuer, audience string, expireH int, userID uint, userna
 
 func JWTAuth(secret, issuer, audience string) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if _, exists := c.Get(CtxScope); exists {
+			c.Next()
+			return
+		}
+
 		auth := c.GetHeader("Authorization")
 		if auth == "" || !strings.HasPrefix(strings.ToLower(auth), "bearer ") {
 			utils.Fail(c, 401, "未登录")
@@ -67,4 +72,3 @@ func JWTAuth(secret, issuer, audience string) gin.HandlerFunc {
 		c.Next()
 	}
 }
-
