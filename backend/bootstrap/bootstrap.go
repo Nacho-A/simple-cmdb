@@ -125,6 +125,23 @@ func SeedDefaults(db *gorm.DB) error {
 		}
 	}
 
+	var menuServices model.Menu
+	_ = db.Where("path = ?", "/cmdb/services").First(&menuServices).Error
+	if menuServices.ID == 0 {
+		menuServices = model.Menu{
+			Name:      "服务列表",
+			Path:      "/cmdb/services",
+			Component: "views/cmdb/services/index.vue",
+			Icon:      "List",
+			ParentID:  &menuCMDB.ID,
+			Order:     2,
+			Hidden:    false,
+		}
+		if err := db.Create(&menuServices).Error; err != nil {
+			return err
+		}
+	}
+
 	var menuSystem model.Menu
 	_ = db.Where("path = ?", "/system").First(&menuSystem).Error
 	if menuSystem.ID == 0 {
@@ -181,14 +198,14 @@ func SeedDefaults(db *gorm.DB) error {
 
 	// 4) role_menus
 	// admin: all
-	if err := db.Model(&adminRole).Association("Menus").Replace(&menuDashboard, &menuCMDB, &menuAssets, &menuSystem, menuUser, menuRole, menuMenu, menuAPIKey); err != nil {
+	if err := db.Model(&adminRole).Association("Menus").Replace(&menuDashboard, &menuCMDB, &menuAssets, &menuServices, &menuSystem, menuUser, menuRole, menuMenu, menuAPIKey); err != nil {
 		return err
 	}
-	// operator/viewer: dashboard + assets
-	if err := db.Model(&operatorRole).Association("Menus").Replace(&menuDashboard, &menuCMDB, &menuAssets); err != nil {
+	// operator/viewer: dashboard + assets + services
+	if err := db.Model(&operatorRole).Association("Menus").Replace(&menuDashboard, &menuCMDB, &menuAssets, &menuServices); err != nil {
 		return err
 	}
-	if err := db.Model(&viewerRole).Association("Menus").Replace(&menuDashboard, &menuCMDB, &menuAssets); err != nil {
+	if err := db.Model(&viewerRole).Association("Menus").Replace(&menuDashboard, &menuCMDB, &menuAssets, &menuServices); err != nil {
 		return err
 	}
 
