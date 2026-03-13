@@ -341,3 +341,86 @@ func (h *Handler) AssetExportExcel(c *gin.Context) {
 		nil,
 	)
 }
+
+type ServiceItem struct {
+	ServiceName string   `json:"service_name"`
+	PrivateIPs  []string `json:"private_ips"`
+	PublicIPs   []string `json:"public_ips"`
+	AssetCount  int      `json:"asset_count"`
+}
+
+func (h *Handler) ServiceList(c *gin.Context) {
+	page, pageSize, offset, limit := utils.GetPage(c)
+	q := strings.TrimSpace(c.Query("q"))
+
+	dbq := h.DB.Model(&model.CMDBAsset{})
+	if q != "" {
+		dbq = dbq.Where("service_name LIKE ?", "%"+q+"%")
+	}
+
+	type serviceRow struct {
+		ServiceName string
+		PrivateIP   string
+		PublicIP    string
+	}
+
+	var rows []serviceRow
+	if err := dbq.Select("service_name, private_ip, public_ip").Find(&rows).Error; err != nil {
+		utils.Fail(c, 500, "查询失败")
+		return
+	}
+
+	serviceMap := make(map[string]*ServiceItem)
+	for _, row := range rows {
+		if row.ServiceName == "" {
+			continue
+		}
+		item, ok := serviceMap[row.ServiceName]
+		if !ok {
+			item = &ServiceItem{
+				ServiceName: row.ServiceName,
+				PrivateIPs:  []string{},
+				PublicIPs:   []string{},
+			}
+			serviceMap[row.ServiceName] = item
+		}
+		item.AssetCount++
+		if row.PrivateIP != "" && !contains(item.PrivateIPs, row.PrivateIP) {
+			item.PrivateIPs = append(item.PrivateIPs, row.PrivateIP)
+		}
+		if row.PublicIP != "" && !contains(item.PublicIPs, row.PublicIP) {
+			item.PublicIPs = append(item.PublicIPs, row.PublicIP)
+		}
+	}
+
+	items := make([]ServiceItem, 0, len(serviceMap))
+	for _, v := range serviceMap {
+		items = append(items, *v)
+	}
+
+	total := len(items)
+	start := offset
+	if start > total {
+		start = total
+	}
+	end := start + limit
+	if end > total {
+		end = total
+	}
+
+	utils.OK(c, gin.H{
+		"items":     items[start:end],
+		"total":     total,
+		"page":      page,
+		"page_size": pageSize,
+	})
+}
+
+func contains(slice []string, item string) bool {
+	for _, v := range slice {
+		if v == item {
+			return true
+		}
+	}
+	return false
+}
