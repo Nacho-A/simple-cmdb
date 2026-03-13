@@ -63,6 +63,9 @@ func New(cfg *config.Config, db *gorm.DB, log *zap.Logger) *gin.Engine {
 		authed.PUT("/menus/:id", h.MenuUpdate)
 		authed.DELETE("/menus/:id", h.MenuDelete)
 
+		// 服务列表
+		authed.GET("/cmdb/services", h.ServiceList)
+
 		// CMDB资产
 		authed.GET("/cmdb/assets", h.AssetList)
 		authed.GET("/cmdb/assets/:id", h.AssetGet)
