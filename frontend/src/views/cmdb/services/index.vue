@@ -2,7 +2,9 @@
   <div class="page page--table">
     <SearchForm @search="onSearch" @reset="onReset">
       <div class="filters">
-        <el-input v-model="query.q" placeholder="服务名称" clearable />
+        <el-input v-model="query.service_name" placeholder="服务名称" clearable />
+        <el-input v-model="query.private_ip" placeholder="私网IP" clearable />
+        <el-input v-model="query.public_ip" placeholder="公网IP" clearable />
       </div>
     </SearchForm>
 
@@ -77,7 +79,9 @@ const page = ref(1)
 const pageSize = ref(10)
 
 const query = reactive({
-  q: '',
+  service_name: '',
+  private_ip: '',
+  public_ip: '',
 })
 
 async function fetchList() {
@@ -100,7 +104,9 @@ function onSearch() {
 }
 
 function onReset() {
-  query.q = ''
+  query.service_name = ''
+  query.private_ip = ''
+  query.public_ip = ''
   page.value = 1
   fetchList()
 }
@@ -135,7 +141,7 @@ onMounted(() => {
 }
 .filters {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
 }
 .title {

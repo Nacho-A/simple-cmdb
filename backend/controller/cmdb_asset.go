@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/xuri/excelize/v2"
+	"go.uber.org/zap"
 	"gorm.io/datatypes"
 	"gorm.io/gorm"
 
@@ -351,11 +352,27 @@ type ServiceItem struct {
 
 func (h *Handler) ServiceList(c *gin.Context) {
 	page, pageSize, offset, limit := utils.GetPage(c)
-	q := strings.TrimSpace(c.Query("q"))
+	serviceName := strings.TrimSpace(c.Query("service_name"))
+	privateIP := strings.TrimSpace(c.Query("private_ip"))
+	publicIP := strings.TrimSpace(c.Query("public_ip"))
+
+	h.Log.Info("ServiceList query",
+		zap.String("service_name", serviceName),
+		zap.String("private_ip", privateIP),
+		zap.String("public_ip", publicIP),
+		zap.Int("page", page),
+		zap.Int("page_size", pageSize),
+	)
 
 	dbq := h.DB.Model(&model.CMDBAsset{})
-	if q != "" {
-		dbq = dbq.Where("service_name LIKE ?", "%"+q+"%")
+	if serviceName != "" {
+		dbq = dbq.Where("service_name LIKE ?", "%"+serviceName+"%")
+	}
+	if privateIP != "" {
+		dbq = dbq.Where("private_ip LIKE ?", "%"+privateIP+"%")
+	}
+	if publicIP != "" {
+		dbq = dbq.Where("public_ip LIKE ?", "%"+publicIP+"%")
 	}
 
 	type serviceRow struct {
