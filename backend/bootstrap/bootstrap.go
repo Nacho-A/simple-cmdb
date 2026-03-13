@@ -174,10 +174,14 @@ func SeedDefaults(db *gorm.DB) error {
 	if err != nil {
 		return err
 	}
+	menuAPIKey, err := ensureChild("/system/api-key", "API Key", "views/system/api-key/index.vue", "Key", 4)
+	if err != nil {
+		return err
+	}
 
 	// 4) role_menus
 	// admin: all
-	if err := db.Model(&adminRole).Association("Menus").Replace(&menuDashboard, &menuCMDB, &menuAssets, &menuSystem, menuUser, menuRole, menuMenu); err != nil {
+	if err := db.Model(&adminRole).Association("Menus").Replace(&menuDashboard, &menuCMDB, &menuAssets, &menuSystem, menuUser, menuRole, menuMenu, menuAPIKey); err != nil {
 		return err
 	}
 	// operator/viewer: dashboard + assets
